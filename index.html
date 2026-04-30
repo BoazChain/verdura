@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verdura — AI Hair Care</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Jost',sans-serif;background:#F5EBD8}
+    @keyframes floatAnim{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+    @keyframes pulse3{0%,100%{opacity:.3;transform:scale(.7)}50%{opacity:1;transform:scale(1.1)}}
+    @keyframes slideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+    .vfloat{animation:floatAnim 4s ease-in-out infinite}
+    .vpulse{animation:pulse3 1.2s ease-in-out infinite}
+    .vslide{animation:slideUp .5s ease forwards}
+    ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#C4924A40;border-radius:2px}
+    .vnav-link:hover{color:#C4924A!important}
+    .vbtn:hover{opacity:.88!important;cursor:pointer!important}
+    .vcard:hover{transform:translateY(-4px)!important;box-shadow:0 12px 40px rgba(28,56,41,.12)!important}
+    textarea:focus,input:focus{outline:none}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useEffect } = React;
+const DG='#1C3829',MG='#2D5A3D',CR='#F5EBD8',GD='#C4924A',WH='#FDFAF6',TX='#2C1A0E',MU='#8A7060',GL='#F0D9B5';
+
+const SYS=`You are Soleil, a warm and deeply knowledgeable expert haircare AI for Verdura Hair. You specialize in:
+- Hair typing (1A-4C system), porosity, density, and elasticity
+- Scalp health and hair growth (rosemary oil, scalp massage, DHT)
+- Ingredient science per hair type
+- Methods: Curly Girl, LOC/LCO, inversion, protective styling
+- Real product recommendations (drugstore to luxury — use actual brand names)
+
+WHEN A PHOTO IS UPLOADED:
+1. Hair Type: identify type (e.g. "3A/3B loose-to-medium curls")
+2. Characteristics: porosity, density, texture, condition
+3. Top 3 Needs
+4. Personalized Routine: wash day + between-wash
+5. Product Picks: 5 specific products with reasons
+
+Use ✦ for bullets. Be warm, specific, and practical.`;
+
+function ChatBot({onClose}){
+  const [msgs,setMsgs]=useState([{role:'assistant',text:"Hi! I'm Soleil ✦ your personal haircare expert.\n\nAsk me anything about growing or thickening your hair, or upload a photo and I'll analyze your exact hair type and give you a fully personalized routine + product picks!"}]);
+  const [inp,setInp]=useState('');
+  const [busy,setBusy]=useState(false);
+  const [img,setImg]=useState(null);
+  const [prev,setPrev]=useState(null);
+  const endRef=useRef(null);
+  const fRef=useRef(null);
+
+  useEffect(()=>{endRef.current?.scrollIntoView({behavior:'smooth'})},[msgs,busy]);
+
+  const onFile=e=>{
+    const f=e.target.files[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=ev=>{setImg({b64:ev.target.result.split(',')[1],mt:f.type});setPrev(ev.target.result)};
+    r.readAsDataURL(f);
+  };
+
+  const send=async()=>{
+    const txt=inp.trim()||(img?'Please analyze my hair from this photo — tell me my hair type, top needs, a personalized routine and product recommendations.':'');
+    if(!txt&&!img)return;
+    const ci=img,cp=prev;
+    setMsgs(p=>[...p,{role:'user',text:txt,imgPrev:cp}]);
+    setInp('');setImg(null);setPrev(null);setBusy(true);
+    const apiMsgs=msgs.map(m=>({role:m.role,content:m.text}));
+    apiMsgs.push({role:'user',content:ci?[{type:'image',source:{type:'base64',media_type:ci.mt,data:ci.b64}},{type:'text',text:txt}]:txt});
+    try{
+      const res=await fetch('/api/chat',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:SYS,messages:apiMsgs})
+      });
+      const d=await res.json();
+      if(d.error){setMsgs(p=>[...p,{role:'assistant',text:`Error: ${d.error.message}`}]);setBusy(false);return;}
+      setMsgs(p=>[...p,{role:'assistant',text:d.content?.find(b=>b.type==='text')?.text||'Something went wrong.'}]);
+    }catch{setMsgs(p=>[...p,{role:'assistant',text:'Connection error — please try again.'}]);}
+    setBusy(false);
+  };
+
+  return(
+    <div className="vslide" style={{position:'fixed',bottom:96,right:24,width:390,height:580,background:WH,borderRadius:22,boxShadow:`0 24px 80px ${DG}35`,display:'flex',flexDirection:'column',overflow:'hidden',border:`1px solid ${GD}40`,zIndex:1001,fontFamily:"'Jost',sans-serif"}}>
+      <div style={{background:`linear-gradient(135deg,${DG},${MG})`,padding:'18px 22px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          <div style={{width:38,height:38,borderRadius:'50%',background:`${GD}30`,border:`1.5px solid ${GD}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>✦</div>
+          <div>
+            <div style={{color:CR,fontFamily:"'Cormorant Garamond',serif",fontSize:20}}>Soleil</div>
+            <div style={{color:`${GL}70`,fontSize:10,letterSpacing:2,textTransform:'uppercase'}}>AI Hair Expert</div>
+          </div>
+        </div>
+        <button onClick={onClose} style={{background:`${WH}15`,border:`1px solid ${CR}20`,color:CR,cursor:'pointer',fontSize:18,width:32,height:32,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
+      </div>
+      <div style={{flex:1,overflowY:'auto',padding:'18px 16px 8px',display:'flex',flexDirection:'column',gap:14}}>
+        {msgs.map((m,i)=>(
+          <div key={i} style={{display:'flex',flexDirection:'column',alignItems:m.role==='user'?'flex-end':'flex-start',maxWidth:'84%',alignSelf:m.role==='user'?'flex-end':'flex-start'}}>
+            {m.imgPrev&&<img src={m.imgPrev} alt="hair" style={{width:'100%',maxWidth:200,borderRadius:12,marginBottom:6,border:`2px solid ${GD}40`}}/>}
+            <div style={{padding:'11px 15px',borderRadius:m.role==='user'?'18px 18px 4px 18px':'18px 18px 18px 4px',background:m.role==='user'?DG:`${GD}18`,color:m.role==='user'?CR:TX,fontSize:13.5,lineHeight:1.65,whiteSpace:'pre-wrap',border:m.role==='assistant'?`1px solid ${GD}25`:'none'}}>
+              {m.text}
+            </div>
+          </div>
+        ))}
+        {busy&&(
+          <div style={{display:'flex',gap:5,alignItems:'center',padding:'12px 16px',background:`${GD}15`,borderRadius:'18px 18px 18px 4px',border:`1px solid ${GD}25`,alignSelf:'flex-start'}}>
+            {[0,.25,.5].map((d,i)=><div key={i} className="vpulse" style={{width:8,height:8,borderRadius:'50%',background:GD,animationDelay:`${d}s`}}/>)}
+          </div>
+        )}
+        <div ref={endRef}/>
+      </div>
+      <div style={{padding:'12px 16px',borderTop:`1px solid ${GD}25`,background:WH}}>
+        {prev&&(
+          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10,background:`${GD}10`,borderRadius:10,padding:'8px 12px'}}>
+            <img src={prev} alt="preview" style={{width:48,height:48,objectFit:'cover',borderRadius:8,border:`1.5px solid ${GD}`}}/>
+            <span style={{fontSize:12,color:MU,flex:1}}>Photo ready to analyze</span>
+            <button onClick={()=>{setImg(null);setPrev(null);}} style={{background:'none',border:'none',color:MU,cursor:'pointer',fontSize:18}}>×</button>
+          </div>
+        )}
+        <div style={{display:'flex',gap:8,alignItems:'flex-end'}}>
+          <button onClick={()=>fRef.current.click()} style={{width:38,height:38,borderRadius:10,border:`1px solid ${GD}40`,background:`${GD}15`,cursor:'pointer',fontSize:16,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>📷</button>
+          <input ref={fRef} type="file" accept="image/*" onChange={onFile} style={{display:'none'}}/>
+          <textarea value={inp} onChange={e=>setInp(e.target.value)}
+            onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}}
+            placeholder="Ask about your hair..." rows={1}
+            style={{flex:1,border:`1px solid ${GD}40`,borderRadius:12,padding:'10px 14px',fontSize:13.5,fontFamily:"'Jost',sans-serif",background:CR,color:TX,resize:'none',maxHeight:72,lineHeight:1.5}}/>
+          <button onClick={send} disabled={busy} style={{width:38,height:38,borderRadius:10,border:'none',background:DG,cursor:'pointer',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',opacity:busy?.5:1}}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={CR} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App(){
+  const [chat,setChat]=useState(false);
+  const serif="'Cormorant Garamond',Georgia,serif";
+  const sans="'Jost',system-ui,sans-serif";
+
+  const hairTypes=[
+    {t:'Type 1',n:'Straight',e:'—',desc:'Naturally straight root to tip. Tends to get oily. Reflects light beautifully. Fine (1A) to coarse (1C).',needs:'Lightweight moisture, volume, scalp balance',tip:'Avoid heavy oils — they weigh straight hair down instantly.'},
+    {t:'Type 2',n:'Wavy',e:'~',desc:'S-shaped waves. Loose beachy (2A) to defined frizzy waves (2C). Lives between straight and curly.',needs:'Frizz control, curl definition, lightweight hydration',tip:'Scrunch curl cream into soaking wet hair for defined waves.'},
+    {t:'Type 3',n:'Curly',e:'○',desc:'Springy curls from wide loops (3A) to tight corkscrews (3C). Prone to dryness and frizz.',needs:'Deep moisture, protein balance, curl clumping',tip:'Deep condition weekly. Finger-coil sections for max definition.'},
+    {t:'Type 4',n:'Coily',e:'◉',desc:'Tight coils or kinks (4A–4C). Most fragile, highest shrinkage. Dense, incredible volume.',needs:'Intense moisture, heavy sealants, protective styles',tip:'LOC method (liquid → oil → cream) is your foundation.'},
+  ];
+  const tips=[
+    {icon:'🫧',title:'Scalp Health',items:['Daily 4-min scalp massage boosts blood flow to follicles','Rosemary oil (2-3 drops nightly) rivals minoxidil in growth studies','Monthly exfoliation clears buildup blocking follicles','Keep scalp balanced — not over-washed, not under-washed']},
+    {icon:'🥑',title:'Nutrition',items:['Biotin (2,500–5,000mcg/day) strengthens keratin structure','Iron deficiency is the #1 cause of thinning — get levels checked','Hair is 95% protein: eggs, fish, legumes daily','Zinc, Vitamin D3, and Omega-3s directly feed follicle health']},
+    {icon:'🌙',title:'Protective Habits',items:['Silk or satin pillowcase cuts overnight friction breakage','Always detangle from ends upward — never root to tip','Keep heat tools under 150°C and always use protectant','Loose braids and buns reduce mechanical stress on the shaft']},
+  ];
+  const steps=[
+    {n:'01',s:'Pre-Poo Treatment',d:'Coat mid-lengths and ends in coconut or olive oil 30–60 min before washing. Reduces hygral fatigue — protein loss from swelling when wet.'},
+    {n:'02',s:'Scalp Cleanse',d:'Apply shampoo only to scalp and roots. Massage in circles for 2 min. Let foam rinse through ends — no scrubbing needed.'},
+    {n:'03',s:'Deep Condition',d:'Apply from ears to ends. Sit under a heated cap for 20–30 min or overnight. Choose moisture or protein based on current elasticity.'},
+    {n:'04',s:'Apply Leave-In',d:'Work into soaking wet hair. High porosity: LOC method (liquid → oil → cream). Low porosity: keep lightweight, apply to very wet hair.'},
+    {n:'05',s:'Style & Seal',d:'Define, diffuse, or air dry. Finish with argan or jojoba oil to seal the cuticle, lock in shine, and block humidity.'},
+  ];
+
+  return(
+    <div style={{fontFamily:sans,background:CR,color:TX}}>
+      <nav style={{position:'sticky',top:0,zIndex:100,height:64,padding:'0 48px',background:`${WH}F0`,backdropFilter:'blur(12px)',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:`1px solid ${GD}25`}}>
+        <div style={{fontFamily:serif,fontSize:22,letterSpacing:4,color:DG}}>VERDURA</div>
+        <div style={{display:'flex',gap:36,fontSize:12,letterSpacing:1.5,textTransform:'uppercase',color:MU}}>
+          {[['Hair Types','#hair-types'],['Growth Tips','#growth-tips'],['Routines','#routines']].map(([l,h])=>(
+            <a key={l} href={h} className="vnav-link" style={{color:MU,textDecoration:'none',transition:'color .2s'}}>{l}</a>
+          ))}
+        </div>
+        <button onClick={()=>setChat(true)} className="vbtn"
+          style={{background:DG,color:WH,border:'none',padding:'10px 26px',borderRadius:30,fontSize:12,letterSpacing:1.5,cursor:'pointer',fontFamily:sans,textTransform:'uppercase'}}>
+          Ask Soleil ✦
+        </button>
+      </nav>
+
+      <section style={{maxWidth:1160,margin:'0 auto',padding:'72px 48px 60px',display:'grid',gridTemplateColumns:'1fr 420px',gap:64,alignItems:'center'}}>
+        <div>
+          <p style={{fontSize:10,letterSpacing:5,textTransform:'uppercase',color:GD,marginBottom:20,fontWeight:500}}>AI-Powered Haircare</p>
+          <h1 style={{fontFamily:serif,fontSize:68,lineHeight:1.05,fontWeight:300,color:DG,marginBottom:28}}>
+            Your hair,<br/><em style={{fontStyle:'italic',color:GD}}>finally</em><br/>understood.
+          </h1>
+          <p style={{fontSize:15.5,lineHeight:1.9,color:MU,marginBottom:44,maxWidth:460}}>
+            Upload a photo for instant hair type analysis, or chat with Soleil — your AI haircare expert — for personalized routines, growth science, and exact product picks.
+          </p>
+          <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
+            <button onClick={()=>setChat(true)} className="vbtn"
+              style={{background:DG,color:WH,border:'none',padding:'16px 38px',borderRadius:40,fontSize:14,cursor:'pointer',fontFamily:sans}}>
+              Chat with Soleil
+            </button>
+            <button onClick={()=>setChat(true)} className="vbtn"
+              style={{background:'transparent',color:DG,border:`1.5px solid ${DG}`,padding:'16px 28px',borderRadius:40,fontSize:14,cursor:'pointer',fontFamily:sans}}>
+              📷 Analyze My Hair
+            </button>
+          </div>
+          <div style={{display:'flex',gap:40,marginTop:52}}>
+            {[['12+','Hair Types'],['50+','Growth Tips'],['100+','Product Picks']].map(([v,l])=>(
+              <div key={l}>
+                <div style={{fontFamily:serif,fontSize:32,color:DG,lineHeight:1}}>{v}</div>
+                <div style={{fontSize:11,color:MU,letterSpacing:1,marginTop:4}}>{l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{position:'relative',height:460,display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <div className="vfloat" style={{width:360,height:360,borderRadius:'50%',background:`radial-gradient(circle at 35% 40%, ${GD}20, ${DG}12)`,border:`1px solid ${GD}50`,display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
+            <div style={{fontSize:140,opacity:.12,userSelect:'none',lineHeight:1}}>🌿</div>
+            <div style={{position:'absolute',top:40,right:50,fontSize:28,opacity:.5}}>✿</div>
+            <div style={{position:'absolute',bottom:50,left:30,fontSize:22,opacity:.35,transform:'rotate(-15deg)'}}>❧</div>
+          </div>
+          {[{label:'Upload a photo',sub:'Get hair type analysis',x:-70,y:80},{label:'Personalized routines',sub:'Step-by-step care',x:230,y:130},{label:'Product recommendations',sub:'Drugstore to luxury',x:-50,y:320}].map((p,i)=>(
+            <div key={i} style={{position:'absolute',left:p.x,top:p.y,background:WH,border:`1px solid ${GD}35`,borderRadius:16,padding:'10px 18px',boxShadow:`0 4px 24px ${DG}12`}}>
+              <div style={{fontSize:13,fontWeight:500,color:DG}}>{p.label}</div>
+              <div style={{fontSize:11,color:MU,marginTop:2}}>{p.sub}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section id="hair-types" style={{background:DG,padding:'80px 48px'}}>
+        <div style={{maxWidth:1160,margin:'0 auto'}}>
+          <p style={{fontSize:10,letterSpacing:5,textTransform:'uppercase',color:GD,marginBottom:12}}>Know Your Hair</p>
+          <h2 style={{fontFamily:serif,fontSize:46,fontWeight:300,color:CR,marginBottom:52}}>Find your hair type</h2>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:20}}>
+            {hairTypes.map((h,i)=>(
+              <div key={i} className="vcard" style={{background:`${WH}08`,border:`1px solid ${GD}30`,borderRadius:20,padding:'32px 26px',transition:'all .3s ease'}}>
+                <div style={{width:52,height:52,borderRadius:'50%',background:`${GD}20`,border:`1px solid ${GD}40`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,marginBottom:20,color:GD,fontFamily:serif}}>{h.e}</div>
+                <p style={{fontSize:10,letterSpacing:3,textTransform:'uppercase',color:GD,marginBottom:8}}>{h.t}</p>
+                <h3 style={{fontFamily:serif,fontSize:28,fontWeight:400,color:CR,marginBottom:14}}>{h.n}</h3>
+                <p style={{fontSize:12.5,lineHeight:1.75,color:`${CR}65`,marginBottom:18}}>{h.desc}</p>
+                <div style={{borderTop:`1px solid ${GD}25`,paddingTop:16}}>
+                  <p style={{fontSize:10,letterSpacing:2,color:GD,textTransform:'uppercase',marginBottom:6}}>Key Needs</p>
+                  <p style={{fontSize:12,color:`${CR}60`,lineHeight:1.6,marginBottom:12}}>{h.needs}</p>
+                  <p style={{fontSize:11.5,color:`${GD}`,fontStyle:'italic',lineHeight:1.5}}>💡 {h.tip}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{textAlign:'center',marginTop:48}}>
+            <button onClick={()=>setChat(true)} className="vbtn"
+              style={{background:GD,color:DG,border:'none',padding:'15px 40px',borderRadius:30,fontSize:13,cursor:'pointer',fontFamily:sans,fontWeight:500}}>
+              📷 Upload a Photo to Find Your Type
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section id="growth-tips" style={{padding:'80px 48px'}}>
+        <div style={{maxWidth:1160,margin:'0 auto'}}>
+          <p style={{fontSize:10,letterSpacing:5,textTransform:'uppercase',color:GD,marginBottom:12}}>Science-Backed</p>
+          <h2 style={{fontFamily:serif,fontSize:46,fontWeight:300,color:DG,marginBottom:56}}>Growth & Thickness</h2>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:28}}>
+            {tips.map((tip,i)=>(
+              <div key={i} className="vcard" style={{background:WH,border:`1px solid ${GD}22`,borderRadius:22,padding:'34px 30px',transition:'all .3s ease'}}>
+                <div style={{fontSize:38,marginBottom:20}}>{tip.icon}</div>
+                <h3 style={{fontFamily:serif,fontSize:24,fontWeight:400,color:DG,marginBottom:24}}>{tip.title}</h3>
+                <ul style={{listStyle:'none',display:'flex',flexDirection:'column',gap:13}}>
+                  {tip.items.map((t,j)=>(
+                    <li key={j} style={{display:'flex',gap:10,fontSize:13,lineHeight:1.65,color:MU}}>
+                      <span style={{color:GD,flexShrink:0}}>✦</span><span>{t}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+          <div style={{background:DG,borderRadius:24,padding:'44px 48px',marginTop:48,display:'flex',alignItems:'center',justifyContent:'space-between',gap:40}}>
+            <div style={{maxWidth:560}}>
+              <h3 style={{fontFamily:serif,fontSize:30,fontWeight:300,color:CR,marginBottom:12}}>Get advice specific to your hair</h3>
+              <p style={{fontSize:14,color:`${CR}70`,lineHeight:1.7}}>Upload a photo and Soleil will identify your type, analyze your needs, and build you a growth routine with real product names.</p>
+            </div>
+            <button onClick={()=>setChat(true)} className="vbtn"
+              style={{background:GD,color:DG,border:'none',padding:'16px 38px',borderRadius:40,fontSize:13,cursor:'pointer',fontFamily:sans,fontWeight:500,whiteSpace:'nowrap'}}>
+              Ask Soleil →
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section id="routines" style={{background:`${GD}10`,padding:'80px 48px'}}>
+        <div style={{maxWidth:1160,margin:'0 auto',display:'grid',gridTemplateColumns:'1fr 1.2fr',gap:72,alignItems:'start'}}>
+          <div style={{position:'sticky',top:88}}>
+            <p style={{fontSize:10,letterSpacing:5,textTransform:'uppercase',color:GD,marginBottom:12}}>Step by Step</p>
+            <h2 style={{fontFamily:serif,fontSize:46,fontWeight:300,color:DG,marginBottom:20,lineHeight:1.1}}>The perfect<br/>wash day</h2>
+            <p style={{fontSize:14,color:MU,lineHeight:1.8,marginBottom:36}}>A structured routine is the single biggest upgrade you can make. This is the foundation — ask Soleil to customize it for your type.</p>
+            <div style={{background:WH,border:`1px solid ${GD}25`,borderRadius:20,padding:'24px 28px',marginBottom:28}}>
+              <p style={{fontSize:12,letterSpacing:1,textTransform:'uppercase',color:GD,marginBottom:12}}>Quick Tips</p>
+              {['Wash frequency depends on your type, not a schedule','Consistency beats perfection every time','Cheap products used right beat expensive ones used wrong'].map((t,i)=>(
+                <div key={i} style={{display:'flex',gap:10,fontSize:13,color:MU,lineHeight:1.6,marginBottom:8}}>
+                  <span style={{color:GD}}>✦</span><span>{t}</span>
+                </div>
+              ))}
+            </div>
+            <button onClick={()=>setChat(true)} className="vbtn"
+              style={{background:DG,color:WH,border:'none',padding:'15px 34px',borderRadius:30,fontSize:13,cursor:'pointer',fontFamily:sans}}>
+              Get My Custom Routine ✦
+            </button>
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:16}}>
+            {steps.map((r,i)=>(
+              <div key={i} style={{display:'flex',gap:22,background:WH,borderRadius:18,padding:'24px 26px',border:`1px solid ${GD}20`}}>
+                <div style={{fontFamily:serif,fontSize:32,fontWeight:300,color:GD,flexShrink:0,lineHeight:1,minWidth:38}}>{r.n}</div>
+                <div>
+                  <div style={{fontSize:14,fontWeight:500,color:DG,marginBottom:6}}>{r.s}</div>
+                  <div style={{fontSize:13,color:MU,lineHeight:1.7}}>{r.d}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section style={{padding:'80px 48px',background:WH}}>
+        <div style={{maxWidth:1160,margin:'0 auto',textAlign:'center'}}>
+          <p style={{fontSize:10,letterSpacing:5,textTransform:'uppercase',color:GD,marginBottom:12}}>Recommended</p>
+          <h2 style={{fontFamily:serif,fontSize:46,fontWeight:300,color:DG,marginBottom:16}}>Products that actually work</h2>
+          <p style={{fontSize:14,color:MU,marginBottom:52,maxWidth:500,margin:'0 auto 52px',lineHeight:1.8}}>Soleil recommends real products tailored to your exact hair type — drugstore to luxury.</p>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:20,marginBottom:48}}>
+            {[{cat:'Growth',name:'Mielle Rosemary Mint Scalp Oil',price:'$10',type:'All Types',tag:'Bestseller 🌿'},{cat:'Moisture',name:'SheaMoisture Manuka Honey Masque',price:'$14',type:'Type 3–4',tag:'Deep Repair'},{cat:'Define',name:'Ouidad Advanced Climate Control',price:'$28',type:'Type 2–3',tag:'Frizz Control'},{cat:'Strengthen',name:'Olaplex No. 3 Hair Perfector',price:'$30',type:'All Types',tag:'Damage Fix'}].map((p,i)=>(
+              <div key={i} className="vcard" style={{background:CR,border:`1px solid ${GD}22`,borderRadius:18,padding:'26px 22px',textAlign:'left',transition:'all .3s ease'}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:12}}>
+                  <span style={{fontSize:10,letterSpacing:2,textTransform:'uppercase',color:GD}}>{p.cat}</span>
+                  <span style={{fontSize:10,background:`${DG}12`,color:DG,padding:'3px 8px',borderRadius:20}}>{p.tag}</span>
+                </div>
+                <div style={{fontFamily:serif,fontSize:17,color:DG,lineHeight:1.35,marginBottom:10}}>{p.name}</div>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:8}}>
+                  <span style={{fontSize:18,fontFamily:serif,color:MG}}>{p.price}</span>
+                  <span style={{fontSize:11,color:MU}}>{p.type}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <button onClick={()=>setChat(true)} className="vbtn"
+            style={{background:DG,color:WH,border:'none',padding:'15px 40px',borderRadius:30,fontSize:13,cursor:'pointer',fontFamily:sans}}>
+            Get Products for My Hair Type ✦
+          </button>
+        </div>
+      </section>
+
+      <footer style={{background:DG,padding:'44px 48px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:20}}>
+        <div>
+          <div style={{fontFamily:serif,fontSize:24,letterSpacing:4,color:CR,marginBottom:6}}>VERDURA</div>
+          <div style={{fontSize:12,color:`${CR}50`}}>AI-powered hair care</div>
+        </div>
+        <div style={{display:'flex',gap:32}}>
+          {['Hair Types','Growth Tips','Routines'].map(l=>(
+            <a key={l} href="#" className="vnav-link" style={{fontSize:12,color:`${CR}55`,textDecoration:'none',letterSpacing:1,textTransform:'uppercase'}}>{l}</a>
+          ))}
+        </div>
+        <div style={{fontSize:12,color:`${CR}40`}}>Built with ✦ for healthier hair. Powered by Claude AI.</div>
+      </footer>
+
+      {!chat&&(
+        <button onClick={()=>setChat(true)} className="vfloat vbtn"
+          style={{position:'fixed',bottom:28,right:28,width:62,height:62,borderRadius:'50%',background:DG,border:`2px solid ${GD}`,cursor:'pointer',zIndex:999,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:`0 6px 28px ${DG}55`,fontSize:22}}>
+          ✦
+        </button>
+      )}
+      {chat&&<ChatBot onClose={()=>setChat(false)}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
